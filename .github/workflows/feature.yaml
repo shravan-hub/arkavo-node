@@ -74,11 +74,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-deny
-          key: ${{ runner.os }}-cargo-deny-0.16.1
+          key: ${{ runner.os }}-cargo-deny-0.18.5
 
       - name: Install cargo-deny
         if: steps.cache-cargo-deny.outputs.cache-hit != 'true'
-        run: cargo install cargo-deny --locked --version 0.16.1
+        run: cargo install cargo-deny --locked --version 0.18.5
 
       - name: Check advisories (uses deny.toml for exceptions)
         run: cargo deny check advisories

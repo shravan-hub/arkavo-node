@@ -4,57 +4,56 @@
 
 This document tracks known security vulnerabilities in Arkavo Node's dependency chain. Many of these vulnerabilities are inherited from upstream Substrate/Polkadot SDK and Ink! dependencies and are being tracked for resolution.
 
-**Last Audit**: 2025-11-23
+**Last Audit**: 2025-11-24
 **Total Dependencies**: 881 crates
-**Vulnerabilities**: 2 advisories, 5 unmaintained, 1 yanked
+**Vulnerabilities**: 1 active CVE, 4 unmaintained advisories, 1 yanked
 
 ### Vulnerability Tracking Approach
 
-We take a **transparent, non-blocking** approach to dependency security:
+We take a **transparent, deny-by-default** approach to dependency security using cargo-deny v2 configuration:
 
-1. **No Ignored Advisories**: We do NOT ignore vulnerabilities in `deny.toml` - this ensures new issues are always detected
-2. **CI Informational Mode**: Security checks run on every PR but use `continue-on-error: true` to avoid blocking development on upstream issues
+1. **Minimal Ignore List**: 5 advisories ignored in `deny.toml` (1 vulnerability + 4 unmaintained, all documented below)
+2. **Deny by Default**: cargo-deny v2 denies all advisories (vulnerability, unmaintained, notice) unless explicitly ignored
 3. **Documented Exceptions**: All known issues are documented here with impact analysis
-4. **GitHub Issues**: Critical vulnerabilities tracked via GitHub issues with labels: `security`, `dependencies`
-5. **Daily Monitoring**: Automated daily audits alert us to new vulnerabilities immediately
+4. **Blocking PR Checks**: Security checks run on every PR and will fail if new vulnerabilities are detected
+5. **Daily Monitoring**: Automated daily audits alert us to new vulnerabilities and create GitHub issues
 
-**Why not block PRs on security failures?**
-- Most issues are in upstream dependencies (Substrate/Ink!) beyond our control
-- Blocking would prevent legitimate development while waiting for upstream fixes
-- Transparency + documentation > false sense of security from ignored advisories
+**Security Configuration (deny.toml v2)**:
+- `[advisories] version = 2`: All advisory types denied by default (no separate unmaintained/notice settings)
+- `yanked = "warn"`: Substrate uses some yanked crates (const-hex), non-blocking
+- `ignore = [5 RUSTSECs]`: 1 vulnerability + 4 unmaintained crates (all upstream Substrate dependencies)
+- `[licenses] version = 2`: Deny all licenses except explicit allow list
+
+**Why this approach?**
+- New vulnerabilities immediately block PRs, forcing immediate triage
+- Explicit ignore list ensures conscious decision-making
+- Transparency via SECURITY.md documentation
+- Upstream issues tracked and documented, not hidden
 
 ### Current Known CVEs
 
-#### RUSTSEC-2025-0055: tracing-subscriber 0.2.25 ⚠️ ERROR
-- **Severity**: Medium
-- **Status**: Upstream dependency (Ink! contracts)
-- **Description**: Logging user input may result in poisoning logs with ANSI escape sequences
-- **Impact**: Log injection attacks if user-controlled input is logged without sanitization
-- **Dependency Path**: `ink_sandbox` → `ark-r1cs-std` → `ark-relations` → `tracing-subscriber 0.2.25`
-- **Mitigation**: Dev dependency through `ink_sandbox` used only in contract testing. Not used in production runtime.
-- **Solution**: Upgrade to `tracing-subscriber >=0.3.20`
-- **Tracking**: https://rustsec.org/advisories/RUSTSEC-2025-0055.html
+#### RUSTSEC-2025-0118: wasmtime 35.0.0 🔴 CRITICAL
+- **Severity**: High
+- **Status**: Upstream dependency (Substrate WASM executor)
+- **Description**: Unsound API access to a WebAssembly shared linear memory. See [GHSA-hc7m-r6v8-hg9q](https://github.com/bytecodealliance/wasmtime/security/advisories/GHSA-hc7m-r6v8-hg9q)
+- **Impact**: Potential memory safety issues in WASM execution
+- **Dependency Path**: `sc-executor` → `sc-executor-wasmtime` → `wasmtime 35.0.0`
+- **Mitigation**: Awaiting Substrate update to wasmtime >=38.0.4. Tracking Polkadot SDK stable2509 branch.
+- **Solution**: Upgrade to wasmtime >=38.0.4 (or >=37.0.3, >=36.0.3, >=24.0.5 depending on major version)
+- **Tracking**: https://rustsec.org/advisories/RUSTSEC-2025-0118.html
+- **Note**: This is a **blocking issue** - awaiting upstream Substrate fix before removing from ignore list
 
-#### RUSTSEC-2025-0010: ring 0.16.20 ⚠️ UNMAINTAINED
-- **Severity**: Medium (Maintenance)
-- **Status**: Upstream dependency (Substrate cryptography)
-- **Description**: ring 0.16.20 is over 4 years old and no longer maintained. Only ring 0.17+ receives security updates.
-- **Impact**: Missing security patches and bug fixes for cryptographic library
-- **Dependency Path**: Substrate → `sp-core` → `ring 0.16.20`
-- **Mitigation**: Awaiting Substrate migration to ring 0.17+. Tracking Polkadot SDK updates.
-- **Solution**: Upgrade to `ring >=0.17.10`
-- **Tracking**: https://rustsec.org/advisories/RUSTSEC-2025-0010.html, https://github.com/briansmith/ring/discussions/2450
+### Unmaintained Dependencies
 
-### Unmaintained Dependencies (Warnings)
+The following dependencies are flagged as unmaintained in our dependency tree:
 
-The following dependencies are flagged as unmaintained but pose lower security risk:
-
-#### RUSTSEC-2024-0388: derivative 2.2.0
-- **Status**: Unmaintained (since 2024-06-26)
-- **Impact**: Derive macro for custom trait implementations
-- **Dependency Path**: Substrate cryptographic libraries (`ark-*` ecosystem)
-- **Mitigation**: Upstream dependency. Monitoring Substrate updates for migration.
-- **Tracking**: https://rustsec.org/advisories/RUSTSEC-2024-0388.html
+#### RUSTSEC-2024-0384: instant 0.1.13
+- **Status**: Unmaintained (since 2024-07-31)
+- **Impact**: WASM-compatible instant measurement library
+- **Dependency Path**: `sc-network` → `wasm-timer` → `parking_lot` → `instant 0.1.13`
+- **Mitigation**: Author recommends `web-time` crate. Awaiting Substrate migration.
+- **Risk**: Low (timing utility, no direct security impact)
+- **Tracking**: https://rustsec.org/advisories/RUSTSEC-2024-0384.html
 
 #### RUSTSEC-2022-0061: parity-wasm 0.45.0
 - **Status**: Deprecated by author (2022-10-01)
@@ -74,12 +73,6 @@ The following dependencies are flagged as unmaintained but pose lower security r
 - **Risk**: Low (compile-time only via `frame-support`)
 - **Tracking**: https://rustsec.org/advisories/RUSTSEC-2024-0370.html
 
-#### RUSTSEC-2020-0163: term_size 0.3.2
-- **Status**: Unmaintained (replaced by `terminal_size`)
-- **Impact**: Terminal size detection in dev tooling
-- **Dependency**: Dev-only via `contract-build` (Ink! tooling)
-- **Solution**: Migrate to `terminal_size` crate
-- **Tracking**: https://rustsec.org/advisories/RUSTSEC-2020-0163.html
 
 ### Yanked Crates
 

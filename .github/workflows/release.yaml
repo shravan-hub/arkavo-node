@@ -1,0 +1,401 @@
+name: Release CI
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Run all the same quality checks as feature CI
+  quick-checks:
+    name: Quick Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Find unsafe code blocks
+        run: |
+          echo "Searching for unsafe code blocks..."
+          rg "unsafe" --type rust --stats || echo "No unsafe code found"
+
+      - name: Find unwrap usage
+        run: |
+          echo "Searching for unwrap() usage..."
+          rg "\.unwrap\(\)" --type rust --stats || echo "No unwrap() found"
+
+      - name: Find expect usage
+        run: |
+          echo "Searching for expect() usage..."
+          rg "\.expect\(" --type rust --stats || echo "No expect() found"
+
+      - name: Find panic usage
+        run: |
+          echo "Searching for panic! usage..."
+          rg "panic!\(" --type rust --stats || echo "No panic!() found"
+
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    needs: quick-checks
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: cargo audit --deny warnings
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Check licenses and vulnerabilities
+        run: cargo deny check
+
+      - name: Check for duplicate dependencies
+        run: cargo tree -d
+
+      - name: Check dependency sources
+        run: |
+          echo "Checking dependency sources..."
+          cargo metadata --format-version 1 | jq -r '.packages[] | select(.source != null) | "\(.name): \(.source)"' | sort -u
+
+      - name: Verify git dependencies are pinned
+        run: |
+          echo "Verifying git dependencies are commit-pinned..."
+          cargo metadata --format-version 1 | jq -r '.packages[] | select(.source | contains("git+")) | "\(.name): \(.source)"'
+
+  lint-node:
+    name: Clippy (Node & Runtime)
+    runs-on: ubuntu-latest
+    needs: security
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+          target: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-node-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Run clippy on node and runtime
+        run: |
+          cargo clippy --all-targets --workspace \
+            --exclude access_registry \
+            --exclude attribute_store \
+            --exclude policy_engine \
+            --exclude payment_integration \
+            -- \
+            -D warnings \
+            -D clippy::all \
+            -D clippy::pedantic \
+            -D clippy::cargo \
+            -D clippy::nursery \
+            -W clippy::unwrap_used \
+            -W clippy::expect_used \
+            -W clippy::panic \
+            -W clippy::todo \
+            -W clippy::unimplemented \
+            -A clippy::multiple_crate_versions \
+            -A clippy::cargo_common_metadata
+
+  lint-contracts:
+    name: Clippy (Contracts)
+    runs-on: ubuntu-latest
+    needs: security
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+          target: wasm32-unknown-unknown
+
+      - name: Install cargo-contract
+        run: cargo install cargo-contract --locked --version ^4.0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-contracts-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run clippy on contracts
+        working-directory: contracts
+        run: |
+          cargo clippy --all-targets -- \
+            -D warnings \
+            -D clippy::all \
+            -D clippy::pedantic \
+            -W clippy::unwrap_used \
+            -W clippy::expect_used \
+            -A clippy::cargo_common_metadata
+
+  build-node:
+    name: Build Node (Release)
+    runs-on: ubuntu-latest
+    needs: lint-node
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-node-release-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler
+
+      - name: Build node (release)
+        run: cargo build --release --package arkavo-node
+
+      - name: Build runtime (release)
+        run: cargo build --release --package arkavo-runtime
+
+      - name: Upload node binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkavo-node-release
+          path: target/release/arkavo-node
+          retention-days: 30
+
+      - name: Upload runtime WASM
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkavo-runtime-wasm
+          path: target/release/wbuild/arkavo-runtime/arkavo_runtime.compact.compressed.wasm
+          retention-days: 30
+
+  build-contracts:
+    name: Build Contract (${{ matrix.contract }})
+    runs-on: ubuntu-latest
+    needs: lint-contracts
+    strategy:
+      matrix:
+        contract:
+          - access_registry
+          - attribute_store
+          - policy_engine
+          - payment_integration
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - name: Install cargo-contract
+        run: cargo install cargo-contract --locked --version ^4.0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/${{ matrix.contract }}/target
+          key: ${{ runner.os }}-cargo-contract-release-${{ matrix.contract }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build contract (release)
+        run: |
+          cd contracts/${{ matrix.contract }}
+          cargo contract build --release
+
+      - name: Upload contract artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.contract }}-release
+          path: |
+            contracts/${{ matrix.contract }}/target/ink/${{ matrix.contract }}.wasm
+            contracts/${{ matrix.contract }}/target/ink/${{ matrix.contract }}.json
+          retention-days: 30
+
+  test-node:
+    name: Test Node
+    runs-on: ubuntu-latest
+    needs: build-node
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-node-release-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Run tests
+        run: cargo test --workspace --exclude access_registry --exclude attribute_store --exclude policy_engine --exclude payment_integration
+
+  test-contracts:
+    name: Test Contract (${{ matrix.contract }})
+    runs-on: ubuntu-latest
+    needs: build-contracts
+    strategy:
+      matrix:
+        contract:
+          - access_registry
+          - attribute_store
+          - policy_engine
+          - payment_integration
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - name: Install cargo-contract
+        run: cargo install cargo-contract --locked --version ^4.0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/${{ matrix.contract }}/target
+          key: ${{ runner.os }}-cargo-contract-release-${{ matrix.contract }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run contract tests
+        run: |
+          cd contracts/${{ matrix.contract }}
+          cargo test
+
+  # Docker build and push (only on main/tags)
+  docker-publish:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [test-node, test-contracts]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Test Docker image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} --version || true
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} --help

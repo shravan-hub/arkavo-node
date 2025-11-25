@@ -269,11 +269,13 @@ mod attribute_store {
         #[ink::test]
         fn authorize_writer_works() {
             let mut contract = AttributeStore::new();
-            let account = Address::from([0x01; 20]);
+            // The caller (default = zero address) authorizes a writer
+            let caller = Address::default();
             let writer = Address::from([0x02; 20]);
 
             contract.authorize_writer(writer);
-            assert!(contract.can_write(writer, account));
+            // Writer should be able to write to the caller's account
+            assert!(contract.can_write(writer, caller));
         }
     }
 }

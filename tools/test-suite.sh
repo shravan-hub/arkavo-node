@@ -281,9 +281,9 @@ for contract in access_registry attribute_store policy_engine payment_integratio
         if cargo contract build --quiet --release --manifest-path "$CONTRACT_DIR/Cargo.toml" 2>&1 >/dev/null; then
             record_test "Contract: $contract compilation" "PASS"
 
-            # Verify artifacts
-            CONTRACT_FILE="$CONTRACT_DIR/target/ink/$contract.contract"
-            METADATA_FILE="$CONTRACT_DIR/target/ink/$contract.json"
+            # Verify artifacts (contracts workspace builds to shared target directory)
+            CONTRACT_FILE="$PROJECT_ROOT/contracts/target/ink/$contract/$contract.contract"
+            METADATA_FILE="$PROJECT_ROOT/contracts/target/ink/$contract/$contract.json"
 
             if [ -f "$CONTRACT_FILE" ] && [ -f "$METADATA_FILE" ]; then
                 record_test "Contract: $contract artifacts" "PASS"
@@ -377,17 +377,17 @@ log_header "Phase 4: Integration Testing"
 
 # Test 4.1: Build deployer
 log_info "Building deployer tool..."
-if cargo build --quiet --package deployer 2>&1 >/dev/null; then
+if cargo build --quiet --manifest-path "$PROJECT_ROOT/tools/deployer/Cargo.toml" 2>&1 >/dev/null; then
     record_test "Deployer tool compilation" "PASS"
 else
     record_test "Deployer tool compilation" "FAIL" "Compilation failed"
 fi
 
 # Test 4.2: Deploy contracts
-if [ -f "$PROJECT_ROOT/target/debug/deployer" ] && [ -n "$NODE_PID" ] && [ "$READY" = true ]; then
+if [ -f "$PROJECT_ROOT/tools/deployer/target/debug/deployer" ] && [ -n "$NODE_PID" ] && [ "$READY" = true ]; then
     log_info "Deploying contracts with deployer tool..."
 
-    DEPLOY_OUTPUT=$("$PROJECT_ROOT/target/debug/deployer" --endpoint ws://127.0.0.1:9944 deploy-all --account alice 2>&1)
+    DEPLOY_OUTPUT=$("$PROJECT_ROOT/tools/deployer/target/debug/deployer" --endpoint ws://127.0.0.1:9944 deploy-all --account alice 2>&1)
     DEPLOY_EXIT=$?
 
     if [ $DEPLOY_EXIT -eq 0 ]; then
@@ -402,11 +402,159 @@ if [ -f "$PROJECT_ROOT/target/debug/deployer" ] && [ -n "$NODE_PID" ] && [ "$REA
         echo "$DEPLOY_OUTPUT" | head -20
     fi
 else
-    if [ ! -f "$PROJECT_ROOT/target/debug/deployer" ]; then
+    if [ ! -f "$PROJECT_ROOT/tools/deployer/target/debug/deployer" ]; then
         record_test "Contract deployment (all contracts)" "SKIP" "Deployer not available"
     elif [ -z "$NODE_PID" ] || [ "$READY" != true ]; then
         record_test "Contract deployment (all contracts)" "SKIP" "Node not running"
     fi
+fi
+
+# Test 4.3-4.7: Access Registry CRUD Cycle
+if [ -n "$NODE_PID" ] && [ "$READY" = true ]; then
+    CRUD_CONTRACT_FILE="$PROJECT_ROOT/contracts/target/ink/access_registry/access_registry.contract"
+
+    if [ -f "$CRUD_CONTRACT_FILE" ]; then
+        log_info "Starting Access Registry CRUD test cycle..."
+
+        # 4.3: Deploy contract (Alice becomes owner)
+        log_info "Deploying access_registry contract..."
+        INSTANTIATE_OUTPUT=$(cargo contract instantiate \
+            --suri //Alice \
+            --url ws://127.0.0.1:9944 \
+            --constructor new \
+            --output-json \
+            -x \
+            -y \
+            "$CRUD_CONTRACT_FILE" 2>&1) || true
+
+        CONTRACT_ADDR=$(echo "$INSTANTIATE_OUTPUT" | grep -o '"contract":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+
+        # Check for pallet-revive compatibility error (ink! 6.0 requires pallet-revive, not pallet-contracts)
+        if echo "$INSTANTIATE_OUTPUT" | grep -q "ReviveApi_instantiate is not found"; then
+            log_warning "Runtime uses pallet-contracts but cargo-contract 6.0 requires pallet-revive"
+            log_warning "See GitHub issue: https://github.com/arkavo-org/arkavo-node/issues/11"
+            record_test "CRUD: Deploy access_registry" "SKIP" "pallet-revive not available (runtime uses pallet-contracts)"
+            record_test "CRUD: Grant entitlement" "SKIP" "pallet-revive not available"
+            record_test "CRUD: Get entitlement" "SKIP" "pallet-revive not available"
+            record_test "CRUD: Has entitlement check" "SKIP" "pallet-revive not available"
+            record_test "CRUD: Revoke entitlement" "SKIP" "pallet-revive not available"
+        elif [ -n "$CONTRACT_ADDR" ]; then
+            record_test "CRUD: Deploy access_registry" "PASS"
+            log_info "  Contract address: $CONTRACT_ADDR"
+
+            # Use Bob as target account (20-byte hex address)
+            BOB_ADDR="0x8eaf04151687736326c9fea17e25fc5287613693"
+
+            # 4.4: Grant entitlement (Alice grants Bob Premium level)
+            log_info "Granting Premium entitlement to Bob..."
+            GRANT_OUTPUT=$(cargo contract call \
+                --suri //Alice \
+                --url ws://127.0.0.1:9944 \
+                --contract "$CONTRACT_ADDR" \
+                --message grant_entitlement \
+                --args "$BOB_ADDR" "Premium" \
+                --output-json \
+                -x \
+                -y \
+                "$CRUD_CONTRACT_FILE" 2>&1)
+            GRANT_EXIT=$?
+
+            if [ $GRANT_EXIT -eq 0 ] && echo "$GRANT_OUTPUT" | grep -qE '"Ok"|"success"'; then
+                record_test "CRUD: Grant entitlement" "PASS"
+            else
+                record_test "CRUD: Grant entitlement" "FAIL" "Grant failed"
+            fi
+
+            # 4.5: Get entitlement (verify Bob has Premium)
+            log_info "Querying Bob's entitlement..."
+            GET_OUTPUT=$(cargo contract call \
+                --suri //Alice \
+                --url ws://127.0.0.1:9944 \
+                --contract "$CONTRACT_ADDR" \
+                --message get_entitlement \
+                --args "$BOB_ADDR" \
+                --output-json \
+                "$CRUD_CONTRACT_FILE" 2>&1)
+
+            if echo "$GET_OUTPUT" | grep -qi "Premium"; then
+                record_test "CRUD: Get entitlement" "PASS"
+                log_info "  Result: Premium (as expected)"
+            else
+                record_test "CRUD: Get entitlement" "FAIL" "Expected Premium"
+            fi
+
+            # 4.6: Has entitlement (verify Bob has at least Basic)
+            log_info "Checking has_entitlement(Bob, Basic)..."
+            HAS_OUTPUT=$(cargo contract call \
+                --suri //Alice \
+                --url ws://127.0.0.1:9944 \
+                --contract "$CONTRACT_ADDR" \
+                --message has_entitlement \
+                --args "$BOB_ADDR" "Basic" \
+                --output-json \
+                "$CRUD_CONTRACT_FILE" 2>&1)
+
+            if echo "$HAS_OUTPUT" | grep -qi "true"; then
+                record_test "CRUD: Has entitlement check" "PASS"
+                log_info "  Result: true (Premium >= Basic)"
+            else
+                record_test "CRUD: Has entitlement check" "FAIL" "Expected true"
+            fi
+
+            # 4.7: Revoke entitlement
+            log_info "Revoking Bob's entitlement..."
+            REVOKE_OUTPUT=$(cargo contract call \
+                --suri //Alice \
+                --url ws://127.0.0.1:9944 \
+                --contract "$CONTRACT_ADDR" \
+                --message revoke_entitlement \
+                --args "$BOB_ADDR" \
+                --output-json \
+                -x \
+                -y \
+                "$CRUD_CONTRACT_FILE" 2>&1)
+            REVOKE_EXIT=$?
+
+            if [ $REVOKE_EXIT -eq 0 ]; then
+                # Verify revocation by querying again
+                VERIFY_OUTPUT=$(cargo contract call \
+                    --suri //Alice \
+                    --url ws://127.0.0.1:9944 \
+                    --contract "$CONTRACT_ADDR" \
+                    --message get_entitlement \
+                    --args "$BOB_ADDR" \
+                    --output-json \
+                    "$CRUD_CONTRACT_FILE" 2>&1)
+
+                if echo "$VERIFY_OUTPUT" | grep -qi "None"; then
+                    record_test "CRUD: Revoke entitlement" "PASS"
+                    log_info "  Bob's entitlement revoked successfully"
+                else
+                    record_test "CRUD: Revoke entitlement" "FAIL" "Entitlement not cleared"
+                fi
+            else
+                record_test "CRUD: Revoke entitlement" "FAIL" "Revoke call failed"
+            fi
+        else
+            record_test "CRUD: Deploy access_registry" "FAIL" "No contract address"
+            record_test "CRUD: Grant entitlement" "SKIP" "Deploy failed"
+            record_test "CRUD: Get entitlement" "SKIP" "Deploy failed"
+            record_test "CRUD: Has entitlement check" "SKIP" "Deploy failed"
+            record_test "CRUD: Revoke entitlement" "SKIP" "Deploy failed"
+        fi
+    else
+        record_test "CRUD: Deploy access_registry" "SKIP" "Contract not built"
+        record_test "CRUD: Grant entitlement" "SKIP" "Contract not built"
+        record_test "CRUD: Get entitlement" "SKIP" "Contract not built"
+        record_test "CRUD: Has entitlement check" "SKIP" "Contract not built"
+        record_test "CRUD: Revoke entitlement" "SKIP" "Contract not built"
+    fi
+else
+    record_test "CRUD: Deploy access_registry" "SKIP" "Node not running"
+    record_test "CRUD: Grant entitlement" "SKIP" "Node not running"
+    record_test "CRUD: Get entitlement" "SKIP" "Node not running"
+    record_test "CRUD: Has entitlement check" "SKIP" "Node not running"
+    record_test "CRUD: Revoke entitlement" "SKIP" "Node not running"
 fi
 
 #==============================================================================

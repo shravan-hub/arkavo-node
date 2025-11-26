@@ -1,8 +1,11 @@
 [package]
 name = "deployer"
 version = "0.1.0"
-authors.workspace = true
-edition.workspace = true
+authors = ["Arkavo Team"]
+edition = "2021"
+
+# Mark as standalone package (not part of root workspace)
+[workspace]
 
 [[bin]]
 name = "deployer"

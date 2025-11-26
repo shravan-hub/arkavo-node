@@ -26,6 +26,9 @@ COPY node ./node
 COPY runtime ./runtime
 
 # Build the node in release mode
+# Set SUBSTRATE_CLI_GIT_COMMIT_HASH to avoid git lookup warnings during Docker builds
+ARG GIT_COMMIT=unknown
+ENV SUBSTRATE_CLI_GIT_COMMIT_HASH=$GIT_COMMIT
 RUN cargo +nightly build --release --package arkavo-node
 
 # Stage 2: Runtime image

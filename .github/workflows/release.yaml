@@ -105,9 +105,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
 
       - name: Test Docker image
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }}
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }} --version || true
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ github.sha }} --help
+          # Use the branch tag which is always available for main branch pushes
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main"
+          docker pull "$IMAGE_TAG"
+          docker run --rm "$IMAGE_TAG" --version || true
+          docker run --rm "$IMAGE_TAG" --help

